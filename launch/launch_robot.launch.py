@@ -9,6 +9,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command
 from launch.actions import RegisterEventHandler
 from launch.event_handlers import OnProcessStart
+from launch_ros.parameter_descriptions import ParameterValue
 
 from launch_ros.actions import Node
 
@@ -39,14 +40,17 @@ def generate_launch_description():
     twist_mux = Node(
             package="twist_mux",
             executable="twist_mux",
-            parameters=[twist_mux_params],
+            parameters=[twist_mux_params, {'use_stamped:': False}],
             remappings=[('/cmd_vel_out','/diff_cont/cmd_vel_unstamped')]
         )
 
     
 
-
-    robot_description = Command(['ros2 param get --hide-type /robot_state_publisher robot_description'])
+    robot_description = ParameterValue(
+        Command(['ros2 param get --hide-type /robot_state_publisher robot_description']),
+        value_type=str
+    )
+    # robot_description = Command(['ros2 param get --hide-type /robot_state_publisher robot_description'])
 
     controller_params_file = os.path.join(get_package_share_directory(package_name),'config','my_controllers.yaml')
 
@@ -85,6 +89,46 @@ def generate_launch_description():
         )
     )
 
+    camera = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            os.path.join(
+                get_package_share_directory(package_name),
+                'launch',
+                'camera.launch.py'
+            )
+        ])
+    )
+
+    rplidar = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            os.path.join(
+                get_package_share_directory(package_name),
+                'launch',
+                'rplidar.launch.py'
+            )
+        ])
+    )
+
+    flip_node = Node(
+        package='my_robot',
+        executable='flip_image_node.py',
+        output='screen',
+        remappings=[
+            ('input_image', '/camera/image_raw'),
+            ('output_image', '/camera/image_flipped')
+        ]
+    )
+
+    compressed_repub = Node(
+        package='image_transport',
+        executable='republish',
+        arguments=['raw', 'compressed'],
+        remappings=[
+            ('in', '/camera/image_flipped'),
+            ('out/compressed', '/camera/image_flipped/compressed')
+        ],
+        output='screen'
+    )
 
     # Code for delaying a node (I haven't tested how effective it is)
     # 
@@ -111,5 +155,9 @@ def generate_launch_description():
         twist_mux,
         delayed_controller_manager,
         delayed_diff_drive_spawner,
-        delayed_joint_broad_spawner
+        delayed_joint_broad_spawner,
+        camera,
+        rplidar,
+        flip_node,
+        compressed_repub
     ])
