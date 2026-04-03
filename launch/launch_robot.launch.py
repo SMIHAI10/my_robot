@@ -12,7 +12,8 @@ from launch.event_handlers import OnProcessStart
 from launch_ros.parameter_descriptions import ParameterValue
 
 from launch_ros.actions import Node
-
+from launch_ros.actions import LifecycleNode
+from nav2_common.launch import RewrittenYaml
 
 
 def generate_launch_description():
@@ -37,14 +38,18 @@ def generate_launch_description():
 
 
     twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
+    # twist_mux = Node(
+    #         package="twist_mux",
+    #         executable="twist_mux",    
+    #         parameters=[twist_mux_params, {'use_stamped': False}],
+    #         remappings=[('/cmd_vel_out','/diff_cont/cmd_vel_unstamped')]
+    #     )
     twist_mux = Node(
-            package="twist_mux",
-            executable="twist_mux",
-            parameters=[twist_mux_params, {'use_stamped:': False}],
-            remappings=[('/cmd_vel_out','/diff_cont/cmd_vel_unstamped')]
-        )
-
-    
+        package="twist_mux",
+        executable="twist_mux",
+        parameters=[twist_mux_params, {'use_stamped': False}],
+        remappings=[('/cmd_vel_out', '/cmd_vel_raw')]
+    )
 
     robot_description = ParameterValue(
         Command(['ros2 param get --hide-type /robot_state_publisher robot_description']),
@@ -128,6 +133,66 @@ def generate_launch_description():
             ('out/compressed', '/camera/image_flipped/compressed')
         ],
         output='screen'
+    )   
+
+    velocity_smoother = LifecycleNode(
+        package="nav2_velocity_smoother",
+        executable="velocity_smoother",
+        name="velocity_smoother",
+        namespace="",
+        output="screen",
+        parameters=[{
+            "smoothing_frequency": 20.0,
+            "scale_velocities": False,
+            "feedback": "OPEN_LOOP",
+            "max_velocity": [0.12, 0.0, 0.8],
+            "min_velocity": [-0.12, 0.0, -0.8],
+            "max_accel": [0.15, 0.0, 0.8],
+            "max_decel": [-0.2, 0.0, -0.8],
+            "odom_topic": "/diff_cont/odom",
+            "velocity_timeout": 0.5,
+            "use_realtime_priority": False
+        }],
+        remappings=[
+            ("cmd_vel", "/cmd_vel_raw"),
+            ("cmd_vel_smoothed", "/diff_cont/cmd_vel_unstamped")
+        ]
+    )
+
+    lifecycle_manager = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        name="lifecycle_manager_velocity",
+        output="screen",
+        parameters=[{
+            "autostart": True,
+            "node_names": ["velocity_smoother"]
+        }]
+    )
+
+    # compressed_repub = Node(
+    #     package='image_transport',
+    #     executable='republish',
+    #     arguments=['raw', 'compressed'],
+    #     remappings=[
+    #         ('in', '/camera/image_flipped'),
+    #         ('out/compressed', '/camera/image_flipped/compressed')
+    #     ],
+    #     output='screen'
+    # )
+    compressed_repub = Node(
+        package='image_transport',
+        executable='republish',
+        name='compressed_repub',
+        output='screen',
+        parameters=[{
+            'in_transport': 'raw',
+            'out_transport': 'compressed',
+        }],
+        remappings=[
+            ('in', '/camera/image_flipped'),
+            ('out/compressed', '/camera/image_flipped/compressed')
+        ]
     )
 
     # Code for delaying a node (I haven't tested how effective it is)
@@ -151,7 +216,7 @@ def generate_launch_description():
     # Launch them all!
     return LaunchDescription([
         rsp,
-        # joystick,
+        #joystick,
         twist_mux,
         delayed_controller_manager,
         delayed_diff_drive_spawner,
@@ -160,4 +225,10 @@ def generate_launch_description():
         rplidar,
         flip_node,
         compressed_repub
+        #camera,
+        rplidar,
+        #flip_node,
+        #compressed_repub,
+        velocity_smoother,
+        lifecycle_manager
     ])
