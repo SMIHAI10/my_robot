@@ -51,6 +51,7 @@ diff_cont:
     linear.x.max_jerk: 0.8
     linear.x.min_jerk: -0.8
 
+
     angular.z.has_velocity_limits: true
     angular.z.has_acceleration_limits: true
     angular.z.has_jerk_limits: true
@@ -60,6 +61,7 @@ diff_cont:
     angular.z.min_acceleration: -0.8
     angular.z.max_jerk: 2.0
     angular.z.min_jerk: -2.0
+
 
 
 
