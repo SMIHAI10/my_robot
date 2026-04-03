@@ -122,6 +122,17 @@ def generate_launch_description():
             ('input_image', '/camera/image_raw'),
             ('output_image', '/camera/image_flipped')
         ]
+    )
+
+    compressed_repub = Node(
+        package='image_transport',
+        executable='republish',
+        arguments=['raw', 'compressed'],
+        remappings=[
+            ('in', '/camera/image_flipped'),
+            ('out/compressed', '/camera/image_flipped/compressed')
+        ],
+        output='screen'
     )   
 
     velocity_smoother = LifecycleNode(
@@ -210,6 +221,10 @@ def generate_launch_description():
         delayed_controller_manager,
         delayed_diff_drive_spawner,
         delayed_joint_broad_spawner,
+        camera,
+        rplidar,
+        flip_node,
+        compressed_repub
         #camera,
         rplidar,
         #flip_node,
