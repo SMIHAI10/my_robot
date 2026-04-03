@@ -17,6 +17,7 @@ def generate_launch_description():
                 'serial_baudrate': 256000,
                 'inverted': False,
                 'scan_mode': 'Standard'
+
             }]
         )
     ])
